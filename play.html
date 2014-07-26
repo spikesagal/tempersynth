@@ -1,0 +1,145 @@
+<!--
+<script src="http://blog.chrislowis.co.uk/js/AudioContextMonkeyPatch.js"></script>
+<script src="http://blog.chrislowis.co.uk/js/raphael-min.js"></script>
+<script src="http://blog.chrislowis.co.uk/js/qwerty-hancock.js"></script>
+-->
+<div id="keyboard"></div>
+<script src="http://stuartmemo.com/qwerty-hancock/qwerty-hancock.js"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+<script>
+		console.log('starting...');
+
+		var context,
+		settings = {
+				id: 'keyboard',
+				width: 600,
+				height: 150,
+				startNote: 'A4',
+				whiteNotesColour: 'white',
+				blackNotesColour: 'black',
+				hoverColour: 'yellow',
+				octaves: 2
+		},
+		keyboard = new QwertyHancock(settings);
+
+		context = new AudioContext();
+
+		masterGain = context.createGain(),
+		nodes = [];
+
+
+		masterGain.gain.value = 0.7; //volume
+		masterGain.connect(context.destination); 
+
+
+		var notes = {
+				/*
+				440: {
+						oscillator: {},
+						gain: {},
+				}
+				*/
+		};
+		var activeNotes = {};
+
+		// 3 deltas for the test: root, middle, last
+		var originalFrequencies = [0, 0, 0];
+
+		keyboard.keyDown = function (note, frequency) {
+				if(!notes[frequency]){
+						var oscillator = context.createOscillator();
+						oscillator.type = 'sine';
+						oscillator.frequency.value = frequency;
+
+						var noteGain = context.createGain();
+						noteGain.gain.value = 0.7;
+						noteGain.connect(context.destination);
+
+						oscillator.connect(noteGain);
+						oscillator.start(0);
+
+						//add to notes
+						notes[frequency] = {
+								oscillator: oscillator,
+								gain: noteGain
+						}
+				}
+				else {
+						var oscillator = notes[frequency].oscillator;
+						notes[frequency].gain.gain.value = .7;
+				}
+				
+				if(!notes[frequency].originalFrequency) notes[frequency].originalFrequency = frequency;
+
+
+				activeNotes[frequency] = notes[frequency];
+				nodes.push(oscillator);
+		};
+
+		keyboard.keyUp = function (note, frequency) {
+				notes[frequency].gain.gain.value = 0;
+				delete activeNotes[frequency];
+				//nodes[i].stop(0);
+				//nodes[i].disconnect();
+		};
+
+
+		// listen to keyboard presses
+		// keys:
+		// 9 0 -> root note down up
+		// - = -> middle note down up
+		// [ ] -> last note down up
+		// backspace -> reset all deltas to 0
+
+		var increment = 1; //hz
+		var deltas = [0, 0, 0];
+
+		var windowListener = window.addEventListener('keypress', function(evt) {
+				var code = evt.charCode || evt.keyCode;
+				//console.log( code );
+				switch(code) {
+						case 32:
+						deltas = [0, 0, 0];
+						evt.preventDefault();
+						break;
+						case 53:
+						//console.log('1st down');
+						deltas[0] -= increment;
+						break;
+						case 54:
+						//console.log('1st up');
+						deltas[0] += increment;
+						break;
+						case 55:
+						//console.log('2nd down');
+						deltas[1] -= increment;
+						break;
+						case 56:
+						//console.log('2nd up');
+						deltas[1] += increment;
+						break;
+						case 57:
+						console.log('3rd down');
+						deltas[2] -= increment;
+						break;
+						case 48:
+						//console.log('3rd up');
+						deltas[2] += increment;
+						break;
+						default:
+						break;
+				}
+
+				console.log(deltas, activeNotes);
+
+				var count = 0;
+				for(var i in activeNotes) {
+						var activeNote = activeNotes[i];
+						console.log(activeNote.oscillator.frequency.value, count, deltas[count]);
+						activeNote.oscillator.frequency.value = activeNote.originalFrequency + deltas[count];
+						++ count;
+				}
+
+		});
+
+</script>
